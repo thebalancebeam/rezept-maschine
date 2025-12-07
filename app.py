@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from openai import OpenAI
+import google.generativeai as genai
 
 # ----------------------------------
 # CONFIG
@@ -11,7 +11,7 @@ st.title("🍳 KI-Rezeptmaschine")
 st.markdown("Gib deine Zutaten ein und erhalte passende Rezepte – erzeugt durch KI.")
 
 # OpenAI Client (API-Key muss in Streamlit Secrets gesetzt werden)
-client = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
+genai.configure(api_key=st.secrets.get("GEMINI_API_KEY", ""))
 
 # ----------------------------------
 # UI – Zutaten-Eingabe
@@ -53,6 +53,8 @@ Format jedes Rezeptes:
 
 2) ERWEITERTE REZEPTE (extended_recipes)
 Erstelle GENAU 3 zusätzliche Rezepte, bei denen du MINIMAL notwendige Zutaten ergänzen darfst.
+Nur realistische, alltägliche Ergänzungen verwenden (z. B. Zwiebel, Butter, Mehl, Eier, Gemüse, Brühe).
+Keine exotischen oder schwer erhältlichen Zutaten.
 Format identisch wie oben.
 
 --------------------------------------------------
@@ -80,10 +82,9 @@ if start:
     with st.spinner("Rezepte werden generiert…"):
         prompt = PROMPT_TEMPLATE.replace("{USER_INGREDIENTS}", zutaten)
 
-        response = client.chat.completions.create(
-            model="gpt-4.1",
-            messages=[{"role": "user", "content": prompt}]
-        )
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(prompt)
+        raw = response.text
 
         raw = response.choices[0].message["content"]
 
