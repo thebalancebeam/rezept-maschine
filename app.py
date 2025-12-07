@@ -36,7 +36,7 @@ genai.configure(api_key=api_key)
 # Wenn du ihn noch nicht kennst → sag Bescheid,
 # dann schreibe ich dir die Model-Lister App.
 
-model_name = "models/gemini-2.0-flash"
+model_name = "models/gemini-2.5-flash-live"
 
 
 
