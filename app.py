@@ -82,8 +82,8 @@ if start:
     with st.spinner("Rezepte werden generiert…"):
         prompt = PROMPT_TEMPLATE.replace("{USER_INGREDIENTS}", zutaten)
 
-        model = genai.GenerativeModel("gemini-pro")
-        response = model.generate_content(prompt)
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        response = model.generate_content([prompt])
         raw = response.text
 
         raw = response.choices[0].message["content"]
