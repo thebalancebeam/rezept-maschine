@@ -1,95 +1,138 @@
 import streamlit as st
 import json
-from openai import OpenAI
+import google.generativeai as genai
 
-# ------------------------------
-# PAGE
-# ------------------------------
-st.set_page_config(page_title="🍳 KI-Rezeptmaschine", layout="wide")
 
-st.title("🍳 KI-Rezeptmaschine")
-st.write("Gib deine Zutaten ein und erhalte passende Rezepte.")
+# ---------------------------------------------------------
+# CONFIG
+# ---------------------------------------------------------
 
-# ------------------------------
-# OPENAI
-# ------------------------------
-api_key = st.secrets.get("OPENAI_API_KEY", "")
+st.set_page_config(page_title="🍳 KI Rezeptmaschine", layout="wide")
+st.title("🍳 KI Rezeptmaschine – Gemini Edition")
+
+
+# ---------------------------------------------------------
+# API KEY
+# ---------------------------------------------------------
+
+api_key = st.secrets.get("GEMINI_API_KEY", "")
+
 if not api_key:
-    st.error("Kein OPENAI_API_KEY gesetzt.")
+    st.error("Kein GEMINI_API_KEY gesetzt!")
     st.stop()
 
-client = OpenAI(api_key=api_key)
+genai.configure(api_key=api_key)
 
-# ------------------------------
+
+# ---------------------------------------------------------
+# Wähle dein Modell
+# ---------------------------------------------------------
+# !!! HIER DEN MODELLNAMEN EINSETZEN !!!
+# Beispiel:
+# model_name = "models/gemini-1.5-pro-latest"
+# oder
+# model_name = "models/gemini-2.0-flash"
+#
+# Wenn du ihn noch nicht kennst → sag Bescheid,
+# dann schreibe ich dir die Model-Lister App.
+
+model_name = "models/gemini-1.5-pro-latest"
+
+
+
+# ---------------------------------------------------------
 # UI
-# ------------------------------
-st.sidebar.header("Zutaten eingeben")
-zutaten = st.sidebar.text_area("Welche Zutaten hast du?", "")
-start = st.sidebar.button("🔍 Rezepte suchen")
+# ---------------------------------------------------------
 
-# ------------------------------
+zutaten = st.text_area("Welche Zutaten hast du?")
+
+start = st.button("🔍 Rezepte suchen")
+
+
+# ---------------------------------------------------------
 # PROMPT
-# ------------------------------
-PROMPT = '''
+# ---------------------------------------------------------
+
+prompt_template = """
 Du bist ein professioneller Koch.
-Erstelle Rezepte basierend auf den Zutaten.
+
+Erstelle basierend auf den Zutaten Rezepte.
+
 Regeln:
 - Gewürze zählen nicht als Zutaten.
-- Ausgabe ausschließlich JSON.
-- 4 strict_recipes ohne Zusatz-Zutaten.
-- 3 extended_recipes mit minimalen realistischen Zusätzen.
+- Gib die Antwort ausschließlich im JSON Format.
+- Kein Text außerhalb von JSON.
 
-User-Zutaten: {ING}
-'''
+Erstelle:
+1) strict_recipes → genau 4 Rezepte nur mit den vorhandenen Zutaten.
+2) extended_recipes → genau 3 Rezepte mit minimalen realistischen Ergänzungen.
 
-# ------------------------------
+Format pro Rezept:
+
+{
+ "title": "...",
+ "description": "...",
+ "ingredients": [],
+ "steps": []
+}
+
+Zutaten des Users:
+{ING}
+"""
+
+
+# ---------------------------------------------------------
 # GENERATE
-# ------------------------------
+# ---------------------------------------------------------
+
 if start:
+
     if not zutaten.strip():
         st.error("Bitte zuerst Zutaten eingeben.")
         st.stop()
 
-    prompt = PROMPT.replace('{ING}', zutaten)
+    prompt = prompt_template.replace("{ING}", zutaten)
 
-    with st.spinner("Rezepte werden generiert…"):
-        try:
-            r = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role":"user", "content": prompt}]
-            )
-            raw = r.choices[0].message.content
-        except Exception as e:
-            st.error(f"OpenAI Fehler: {e}")
-            st.stop()
+    try:
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        raw = response.text
+    except Exception as e:
+        st.error("Gemini Fehler: " + str(e))
+        st.stop()
 
-        try:
-            data = json.loads(raw)
-        except Exception:
-            st.error("Ungültiges JSON von der KI")
-            st.code(raw)
-            st.stop()
 
-        st.header("Ergebnisse")
+    # --------------------------------------------------------
+    # JSON PARSEN
+    # --------------------------------------------------------
 
-        st.subheader("🔒 Strikte Rezepte")
-        for rec in data.get('strict_recipes', []):
-            with st.expander(rec.get('title','Rezept')):
-                st.write(rec.get('description',''))
-                st.markdown('**Zutaten**')
-                st.write('
-'.join(rec.get('ingredients',[])))
-                st.markdown('**Schritte**')
-                for i,s in enumerate(rec.get('steps',[]),1):
-                    st.write(f"{i}. {s}")
+    try:
+        data = json.loads(raw)
+    except Exception:
+        st.error("Die KI hat kein gültiges JSON geliefert.")
+        st.code(raw)
+        st.stop()
 
-        st.subheader("✨ Erweiterte Rezepte")
-        for rec in data.get('extended_recipes', []):
-            with st.expander(rec.get('title','Rezept')):
-                st.write(rec.get('description',''))
-                st.markdown('**Zutaten**')
-                st.write('
-'.join(rec.get('ingredients',[])))
-                st.markdown('**Schritte**')
-                for i,s in enumerate(rec.get('steps',[]),1):
+
+    # --------------------------------------------------------
+    # AUSGABE
+    # --------------------------------------------------------
+
+    st.header("Ergebnisse")
+
+    for section in ["strict_recipes", "extended_recipes"]:
+
+        st.subheader(section.replace("_"," ").title())
+
+        for rec in data.get(section, []):
+
+            with st.expander(rec.get("title","Rezept")):
+
+                st.write(rec.get("description",""))
+
+                st.markdown("**Zutaten**")
+                st.write(rec.get("ingredients",[]))
+
+                st.markdown("**Schritte**")
+                for i,s in enumerate(rec.get("steps",[]),1):
                     st.write(f"{i}. {s}")
