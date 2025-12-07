@@ -83,7 +83,14 @@ if start:
         prompt = PROMPT_TEMPLATE.replace("{USER_INGREDIENTS}", zutaten)
 
         model = genai.GenerativeModel("gemini-1.5-pro")
-        response = model.generate_content([prompt])
+
+try:
+    response = model.generate_content(prompt)
+    raw = response.text
+except Exception as e:
+    st.error(f"Gemini Fehler: {e}")
+    st.stop()
+        response = model.generate_content(prompt)
         raw = response.text
 
         raw = response.choices[0].message["content"]
