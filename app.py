@@ -1,17 +1,15 @@
 import streamlit as st
 import json
-import google.generativeai as genai
-
-st.set_page_config(page_title="🍳 KI-Rezeptmaschine", layout="wide")
-
-st.title("🍳 KI-Rezeptmaschine")
-st.markdown("Gib deine Zutaten ein und erhalte passende Rezepte – erzeugt durch KI.")
+from openai import OpenAI
 
 # API Key
-api_key = st.secrets.get("GEMINI_API_KEY", "")
+api_key = st.secrets.get("OPENAI_API_KEY", "")
 if not api_key:
-    st.error("Kein GEMINI_API_KEY gesetzt.")
+    st.error("Kein OPENAI_API_KEY gesetzt.")
     st.stop()
+
+client = OpenAI(api_key=api_key)
+()
 
 genai.configure(api_key=api_key)
 
@@ -35,10 +33,15 @@ if start:
     prompt = PROMPT.replace("{ING}", zutaten)
 
     with st.spinner("Rezepte werden generiert…"):
-        model = genai.GenerativeModel("gemini-1.5-flash")
         try:
-            response = model.generate_content(prompt)
-            raw = response.text
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            raw = response.choices[0].message.content
+        except Exception as e:
+            st.error(f"OpenAI Fehler: {e}")
+            st.stop()
         except Exception as e:
             st.error(f"Gemini Fehler: {e}")
             st.stop()
