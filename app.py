@@ -35,7 +35,7 @@ if start:
     prompt = PROMPT.replace("{ING}", zutaten)
 
     with st.spinner("Rezepte werden generiert…"):
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         try:
             response = model.generate_content(prompt)
             raw = response.text
@@ -57,7 +57,7 @@ if start:
             with st.expander(r.get("title", "Rezept")):
                 st.write(r.get("description", ""))
                 st.markdown("**Zutaten**")
-                st.write("\\n".join(r.get("ingredients", [])))
+                st.write("\n".join(r.get("ingredients", [])))
                 st.markdown("**Schritte**")
                 for i, step in enumerate(r.get("steps", []), 1):
                     st.write(f"{i}. {step}")
@@ -67,7 +67,7 @@ if start:
             with st.expander(r.get("title", "Rezept")):
                 st.write(r.get("description", ""))
                 st.markdown("**Zutaten**")
-                st.write("\\n".join(r.get("ingredients", [])))
+                st.write("\n".join(r.get("ingredients", [])))
                 st.markdown("**Schritte**")
                 for i, step in enumerate(r.get("steps", []), 1):
                     st.write(f"{i}. {step}")
