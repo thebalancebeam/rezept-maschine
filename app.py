@@ -1,14 +1,15 @@
 import streamlit as st
 import json
+import re
 import google.generativeai as genai
 
 
 # ---------------------------------------------------------
-# CONFIG
+# PAGE
 # ---------------------------------------------------------
 
 st.set_page_config(page_title="🍳 KI Rezeptmaschine", layout="wide")
-st.title("🍳 KI Rezeptmaschine – Gemini Edition")
+st.title("🍳 KI Rezeptmaschine – Gemini")
 
 
 # ---------------------------------------------------------
@@ -25,19 +26,10 @@ genai.configure(api_key=api_key)
 
 
 # ---------------------------------------------------------
-# Wähle dein Modell
+# MODELL
 # ---------------------------------------------------------
-# !!! HIER DEN MODELLNAMEN EINSETZEN !!!
-# Beispiel:
-# model_name = "models/gemini-1.5-pro-latest"
-# oder
-# model_name = "models/gemini-2.0-flash"
-#
-# Wenn du ihn noch nicht kennst → sag Bescheid,
-# dann schreibe ich dir die Model-Lister App.
-
+# HIER dein funktionierendes Modell einsetzen
 model_name = "models/gemini-2.5-flash-lite"
-
 
 
 # ---------------------------------------------------------
@@ -45,7 +37,6 @@ model_name = "models/gemini-2.5-flash-lite"
 # ---------------------------------------------------------
 
 zutaten = st.text_area("Welche Zutaten hast du?")
-
 start = st.button("🔍 Rezepte suchen")
 
 
@@ -54,31 +45,58 @@ start = st.button("🔍 Rezepte suchen")
 # ---------------------------------------------------------
 
 prompt_template = """
-Du bist ein professioneller Koch.
+Du bist ein professioneller Koch und erstellt Rezepte.
 
-Erstelle basierend auf den Zutaten Rezepte.
+Du erhältst vom Nutzer eine Zutatenliste.
 
 Regeln:
-- Gewürze zählen nicht als Zutaten.
-- Gib die Antwort ausschließlich im JSON Format.
-- Kein Text außerhalb von JSON.
+- Gewürze, Salz, Pfeffer, Öl zählen NICHT als Zutaten.
+- Benutze für strict_recipes ausschließlich die vom Nutzer genannten Zutaten.
+- Du musst exakt erstellen:
+    1) strict_recipes → GENAU 4 Rezepte
+    2) extended_recipes → GENAU 3 Rezepte mit minimalen realistischen Ergänzungen
+- Keine Erklärungen.
+- Keine Vorbemerkungen.
+- Keine Nachbemerkungen.
+- Du darfst NUR reines JSON liefern.
+- JSON muss komplett gültig sein.
+- Kein Markdown.
+- Kein ``` Codeblock.
+- Wenn du Fehler machst, musst du den JSON korrigieren.
 
-Erstelle:
-1) strict_recipes → genau 4 Rezepte nur mit den vorhandenen Zutaten.
-2) extended_recipes → genau 3 Rezepte mit minimalen realistischen Ergänzungen.
-
-Format pro Rezept:
+Format jedes Rezepts:
 
 {
- "title": "...",
- "description": "...",
- "ingredients": [],
- "steps": []
+  "title": "",
+  "description": "",
+  "ingredients": [],
+  "steps": []
 }
 
 Zutaten des Users:
 {ING}
 """
+
+
+# ---------------------------------------------------------
+# JSON SAFE PARSER
+# ---------------------------------------------------------
+
+def safe_json_load(text):
+    """extrahiert robust JSON aus KI-Ausgaben"""
+
+    # codeblocks entfernen
+    text = re.sub(r"```(json)?", "", text)
+
+    # nur JSON extrahieren
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1:
+        raise ValueError("Kein JSON gefunden.")
+
+    cleaned = text[start:end+1]
+    return json.loads(cleaned)
 
 
 # ---------------------------------------------------------
@@ -101,38 +119,33 @@ if start:
         st.error("Gemini Fehler: " + str(e))
         st.stop()
 
-
-    # --------------------------------------------------------
-    # JSON PARSEN
-    # --------------------------------------------------------
-
     try:
-        data = json.loads(raw)
-    except Exception:
-        st.error("Die KI hat kein gültiges JSON geliefert.")
+        data = safe_json_load(raw)
+    except Exception as e:
+        st.error("Ungültiges JSON: " + str(e))
         st.code(raw)
         st.stop()
 
 
-    # --------------------------------------------------------
-    # AUSGABE
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # OUTPUT
+    # -----------------------------------------------------
 
     st.header("Ergebnisse")
 
     for section in ["strict_recipes", "extended_recipes"]:
 
-        st.subheader(section.replace("_"," ").title())
+        st.subheader(section.replace("_", " ").title())
 
         for rec in data.get(section, []):
 
-            with st.expander(rec.get("title","Rezept")):
+            with st.expander(rec.get("title", "Rezept")):
 
-                st.write(rec.get("description",""))
+                st.write(rec.get("description", ""))
 
                 st.markdown("**Zutaten**")
-                st.write(rec.get("ingredients",[]))
+                st.write(rec.get("ingredients", []))
 
                 st.markdown("**Schritte**")
-                for i,s in enumerate(rec.get("steps",[]),1):
+                for i, s in enumerate(rec.get("steps", []), 1):
                     st.write(f"{i}. {s}")
